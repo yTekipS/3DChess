@@ -4,9 +4,9 @@
 
 #include "raylib.h"
 #include "raymath.h"
-#include "map"
-#include "string"
-#include "cstdio"
+#include <map>
+#include <string>
+#include <cstdio>
 
 class Game;
 
@@ -32,6 +32,8 @@ private:
 
 public:
     Piece() {}
+    Piece(const Piece &) = default;
+    Piece &operator=(const Piece &other);
     Piece(Turn *turnOrder, const char *color, const Vector3 position, Model &model, Camera3D &camera, Game &game);
     ~Piece();
     void Update();
@@ -64,13 +66,14 @@ private:
     // Pieces
     std::map<std::string, Model> blackPiecesModels;
     std::map<std::string, Model> whitePiecesModels;
-    std::map<std::string, Model> tanPiecesModels;
-    std::map<std::string, Model> brownPiecesModels;
 
 public:
     Piece *selectedPiece = nullptr;
     BoardSquare chessBoardSquares[8][8];
-    Piece piece;
+    std::map<std::string, Piece> whitePieces;
+    std::map<std::string, Piece> blackPieces;
+    std::string themes[4] = {"black-white", "black-tan", "brown-white", "brown-tan"};
+    std::string currentTheme = themes[2];
     Game();
     ~Game();
     void Update();
@@ -82,6 +85,8 @@ public:
     void CameraControl();
     void FlipCamera();
     void InitPieces();
+    void InitBlackPieces();
+    void InitWhitePieces();
 };
 
 #endif // GAME_HPP

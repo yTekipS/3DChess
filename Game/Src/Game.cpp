@@ -5,14 +5,38 @@ Piece::Piece(Turn *turnOrder, const char *color, const Vector3 position, Model &
 {
 }
 
+Piece &Piece::operator=(const Piece &other)
+{
+    if (this == &other)
+        return *this;
+
+    name = other.name;
+    turnOrder = other.turnOrder;
+    color = other.color;
+    position = other.position;
+    for (int i = 0; i < 28; i++)
+    {
+        validMoves[i] = other.validMoves[i];
+    }
+    model = other.model;
+    camera = other.camera;
+    game = other.game;
+    hasMoved = other.hasMoved;
+    selected = other.selected;
+
+    return *this;
+}
+
 Piece::~Piece()
 {
 }
 
 void Piece::Update()
 {
-    Select();
-    Deselect();
+    if (selected)
+        Deselect();
+    else
+        Select();
 }
 
 void Piece::Draw()
@@ -22,12 +46,19 @@ void Piece::Draw()
 
 void Piece::Select()
 {
-    if (*turnOrder != (color == "white" ? Turn::White : Turn::Black) || game->selectedPiece != nullptr)
+    Turn pieceTurn = (std::string(color) == "white") ? Turn::White : Turn::Black;
+    if (*turnOrder != pieceTurn || game->selectedPiece != nullptr)
         return;
-    Ray mouseRay = GetMouseRay(GetMousePosition(), *camera);
-    RayCollision collision = GetRayCollisionMesh(mouseRay, model->meshes[0], model->transform);
-    if (collision.hit && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+
+    Ray mouseRay = GetScreenToWorldRay(GetMousePosition(), *camera);
+
+    Matrix worldTransform = MatrixMultiply(model->transform, MatrixTranslate(position.x, position.y, position.z));
+    RayCollision meshCollision = GetRayCollisionMesh(mouseRay, model->meshes[0], worldTransform);
+
+    if (meshCollision.hit && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
     {
+        TraceLog(LOG_INFO, "Selected piece at position: (%f, %f, %f)", position.x, position.y, position.z);
+
         selected = true;
         game->selectedPiece = this;
     }
@@ -35,13 +66,18 @@ void Piece::Select()
 
 void Piece::Deselect()
 {
-
-    if (*turnOrder != (color == "white" ? Turn::White : Turn::Black) ||game->selectedPiece != this || game->selectedPiece == nullptr)
+    Turn pieceTurn = (std::string(color) == "white") ? Turn::White : Turn::Black;
+    if (*turnOrder != pieceTurn || game->selectedPiece != this || game->selectedPiece == nullptr)
         return;
-    Ray mouseRay = GetMouseRay(GetMousePosition(), *camera);
-    RayCollision collision = GetRayCollisionMesh(mouseRay, model->meshes[0], model->transform);
-    if (collision.hit && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+
+    Ray mouseRay = GetScreenToWorldRay(GetMousePosition(), *camera);
+
+    Matrix worldTransform = MatrixMultiply(model->transform, MatrixTranslate(position.x, position.y, position.z));
+    RayCollision meshCollision = GetRayCollisionMesh(mouseRay, model->meshes[0], worldTransform);
+
+    if (meshCollision.hit && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
     {
+        TraceLog(LOG_INFO, "Deselected piece at position: (%f, %f, %f)", position.x, position.y, position.z);
         selected = false;
         game->selectedPiece = nullptr;
     }
@@ -70,6 +106,14 @@ Game::~Game()
 void Game::Update()
 {
     FlipCamera();
+    for (auto &piece : whitePieces)
+    {
+        piece.second.Update();
+    }
+    for (auto &piece : blackPieces)
+    {
+        piece.second.Update();
+    }
 }
 
 void Game::Draw()
@@ -78,15 +122,21 @@ void Game::Draw()
     BeginMode3D(camera);
 
     ClearBackground(RAYWHITE);
-    DrawModel(chessBoardModels["brown-tan"], boardOrigin, 1.0f, WHITE);
-
+    DrawModel(chessBoardModels[currentTheme], boardOrigin, 1.0f, WHITE);
+    for (auto &piece : whitePieces)
+    {
+        piece.second.Draw();
+    }
+    for (auto &piece : blackPieces)
+    {
+        piece.second.Draw();
+    }
     EndMode3D();
     EndDrawing();
 }
 
 void Game::Run()
 {
-
     while (!WindowShouldClose())
     {
         Update();
@@ -97,25 +147,26 @@ void Game::Run()
 void Game::LoadModels()
 {
     std::string commonPath = "Game/Assets/";
-    std::string lightColors[] = {"white", "tan"};
     std::string darkColors[] = {"black", "brown"};
+    std::string lightColors[] = {"white", "tan"};
     std::string pieces[] = {"pawn", "rook", "knight", "bishop", "queen", "king"};
     for (int i = 0; i < 6; i++)
     {
-        blackPiecesModels.emplace(pieces[i], LoadModel((commonPath + "Pieces/black-" + pieces[i] + ".glb").c_str()));
+        blackPiecesModels.emplace(darkColors[0] + "-" + pieces[i], LoadModel((commonPath + "Pieces/black-" + pieces[i] + ".glb").c_str()));
     }
     for (int i = 0; i < 6; i++)
     {
-        whitePiecesModels.emplace(pieces[i], LoadModel((commonPath + "Pieces/white-" + pieces[i] + ".glb").c_str()));
+        blackPiecesModels.emplace(darkColors[1] + "-" + pieces[i], LoadModel((commonPath + "Pieces/brown-" + pieces[i] + ".glb").c_str()));
     }
     for (int i = 0; i < 6; i++)
     {
-        tanPiecesModels.emplace(pieces[i], LoadModel((commonPath + "Pieces/tan-" + pieces[i] + ".glb").c_str()));
+        whitePiecesModels.emplace(lightColors[0] + "-" + pieces[i], LoadModel((commonPath + "Pieces/white-" + pieces[i] + ".glb").c_str()));
     }
     for (int i = 0; i < 6; i++)
     {
-        brownPiecesModels.emplace(pieces[i], LoadModel((commonPath + "Pieces/brown-" + pieces[i] + ".glb").c_str()));
+        whitePiecesModels.emplace(lightColors[1] + "-" + pieces[i], LoadModel((commonPath + "Pieces/tan-" + pieces[i] + ".glb").c_str()));
     }
+
     for (int i = 0; i < 2; i++)
     {
         for (int j = 0; j < 2; j++)
@@ -132,14 +183,6 @@ void Game::UnloadModels()
         UnloadModel(model.second);
     }
     for (const auto &model : whitePiecesModels)
-    {
-        UnloadModel(model.second);
-    }
-    for (const auto &model : tanPiecesModels)
-    {
-        UnloadModel(model.second);
-    }
-    for (const auto &model : brownPiecesModels)
     {
         UnloadModel(model.second);
     }
@@ -175,6 +218,57 @@ void Game::FlipCamera()
 
 void Game::InitPieces()
 {
-    // Example of initializing a piece on the board
-    piece = Piece(&turnOrder, "white", chessBoardSquares[1][1].position, whitePiecesModels["pawn"], camera, *this);
+    InitWhitePieces();
+    InitBlackPieces();
+}
+
+void Game::InitBlackPieces()
+{
+    blackPieces.clear();
+    std::string darkColors[] = {"black", "brown"};
+    std::string pieceNames[] = {"rook", "knight", "bishop", "queen", "king"};
+    std::string pieceindex;
+
+    for (int i = 0; i < 5; i++)
+    {
+        pieceindex = (currentTheme.find("black") != std::string::npos ? darkColors[0] : darkColors[1]) + "-" + pieceNames[i];
+        if (pieceNames[i] == "queen" || pieceNames[i] == "king")
+        {
+            blackPieces.emplace(pieceNames[i], Piece(&turnOrder, "black", chessBoardSquares[i][7].position, blackPiecesModels[pieceindex], camera, *this));
+            continue;
+        }
+        blackPieces.emplace(pieceNames[i] + "_1", Piece(&turnOrder, "black", chessBoardSquares[i][7].position, blackPiecesModels[pieceindex], camera, *this));
+        blackPieces.emplace(pieceNames[i] + "_2", Piece(&turnOrder, "black", chessBoardSquares[7 - i][7].position, blackPiecesModels[pieceindex], camera, *this));
+    }
+    for (int i = 0; i < 8; i++)
+    {
+        pieceindex = (currentTheme.find("black") != std::string::npos ? darkColors[0] : darkColors[1]) + "-pawn";
+
+        blackPieces.emplace("pawn_" + std::to_string(i + 1), Piece(&turnOrder, "black", chessBoardSquares[i][6].position, blackPiecesModels[pieceindex], camera, *this));
+    }
+}
+
+void Game::InitWhitePieces()
+{
+    whitePieces.clear();
+    std::string lightColors[] = {"white", "tan"};
+    std::string pieceNames[] = {"rook", "knight", "bishop", "queen", "king"};
+    std::string pieceindex;
+
+    for (int i = 0; i < 5; i++)
+    {
+        pieceindex = (currentTheme.find("white") != std::string::npos ? lightColors[0] : lightColors[1]) + "-" + pieceNames[i];
+        if (pieceNames[i] == "queen" || pieceNames[i] == "king")
+        {
+            whitePieces.emplace(pieceNames[i], Piece(&turnOrder, "white", chessBoardSquares[i][0].position, whitePiecesModels[pieceindex], camera, *this));
+            continue;
+        }
+        whitePieces.emplace(pieceNames[i] + "_1", Piece(&turnOrder, "white", chessBoardSquares[i][0].position, whitePiecesModels[pieceindex], camera, *this));
+        whitePieces.emplace(pieceNames[i] + "_2", Piece(&turnOrder, "white", chessBoardSquares[7 - i][0].position, whitePiecesModels[pieceindex], camera, *this));
+    }
+    for (int i = 0; i < 8; i++)
+    {
+        pieceindex = (currentTheme.find("white") != std::string::npos ? lightColors[0] : lightColors[1]) + "-pawn";
+        whitePieces.emplace("pawn_" + std::to_string(i + 1), Piece(&turnOrder, "white", chessBoardSquares[i][1].position, whitePiecesModels[pieceindex], camera, *this));
+    }
 }
