@@ -42,27 +42,43 @@ void Game::Update()
         }
         if (menu.host.Clicked())
         {
-            network.Host();
             if (gameState != HOSTING)
             {
                 gameState = HOSTING;
-                TraceLog(LOG_INFO, "Match hosted");
             }
         }
 
         if (menu.join.Clicked())
         {
-            network.Connect(ipToConnectTo);
-            if (network.IsConnected() == false)
+            ipToConnectTo = menu.GetIp();
+            TraceLog(LOG_INFO, "Trying to connect to: %s", ipToConnectTo.c_str());
+            if (!network.Connect(ipToConnectTo))
             {
-                throw ERROR_CONNECTION_INVALID;
+                TraceLog(LOG_WARNING, "Connection failed to %s", ipToConnectTo.c_str());
                 return;
             }
             if (gameState != CONNECTING)
             {
                 gameState = CONNECTING;
-                TraceLog(LOG_INFO, "Connected to ip: %s", ipToConnectTo);
             }
+        }
+    }
+    break;
+    case HOSTING:
+    {
+        if (network.Host())
+        {
+            gameState = IN_MATCH;
+            TraceLog(LOG_INFO, "Host accepted opponent. Starting match.");
+        }
+    }
+    break;
+    case CONNECTING:
+    {
+        if (network.IsConnected())
+        {
+            gameState = IN_MATCH;
+            TraceLog(LOG_INFO, "Client connected. Starting match.");
         }
     }
     break;
