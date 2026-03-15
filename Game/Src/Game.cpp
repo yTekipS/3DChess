@@ -14,7 +14,7 @@ Game::Game()
     InitPieces();
     menu.Init();
     if (network.Init())
-        TraceLog(LOG_INFO, "Network initialized.");
+        TraceLog(LOG_INFO, "Network initialized succesfully.");
     OccupyCells();
 }
 
@@ -44,7 +44,10 @@ void Game::Update()
         {
             network.Host();
             if (gameState != HOSTING)
+            {
                 gameState = HOSTING;
+                TraceLog(LOG_INFO, "Match hosted");
+            }
         }
 
         if (menu.join.Clicked())
@@ -56,7 +59,10 @@ void Game::Update()
                 return;
             }
             if (gameState != CONNECTING)
+            {
                 gameState = CONNECTING;
+                TraceLog(LOG_INFO, "Connected to ip: %s", ipToConnectTo);
+            }
         }
     }
     break;
