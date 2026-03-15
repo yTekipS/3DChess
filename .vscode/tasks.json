@@ -7,6 +7,9 @@
             "args": [
                 "${workspaceFolder}\\Game\\Src\\main.cpp",
                 "${workspaceFolder}\\Game\\Src\\Game.cpp",
+                "${workspaceFolder}\\Game\\Src\\Pieces.cpp",
+                "${workspaceFolder}\\Game\\Src\\Network.cpp",
+                "${workspaceFolder}\\Game\\Src\\Menu.cpp",
                 "-static",
                 "-O2",
                 "-s",
@@ -18,6 +21,7 @@
                 "-lopengl32",
                 "-lgdi32",
                 "-lwinmm",
+                "-lws2_32",
                 "-L",
                 "C:\\msys64\\mingw64\\lib"
             ],

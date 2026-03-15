@@ -1,93 +1,10 @@
 #include "../Headers/Game.hpp"
 
-Piece::Piece(Turn *turnOrder, const char *color, const Vector3 position, Model &model, Camera3D &camera, Game &game)
-    : turnOrder(turnOrder), color(color), position(position), model(&model), camera(&camera), game(&game)
-{
-}
-
-Piece &Piece::operator=(const Piece &other)
-{
-    if (this == &other)
-        return *this;
-
-    name = other.name;
-    turnOrder = other.turnOrder;
-    color = other.color;
-    position = other.position;
-    for (int i = 0; i < 28; i++)
-    {
-        validMoves[i] = other.validMoves[i];
-    }
-    model = other.model;
-    camera = other.camera;
-    game = other.game;
-    hasMoved = other.hasMoved;
-    selected = other.selected;
-
-    return *this;
-}
-
-Piece::~Piece()
-{
-}
-
-void Piece::Update()
-{
-    if (selected)
-        Deselect();
-    else
-        Select();
-}
-
-void Piece::Draw()
-{
-    DrawModel(*model, position, 1.0f, selected ? RED : WHITE);
-}
-
-void Piece::Select()
-{
-    Turn pieceTurn = (std::string(color) == "white") ? Turn::White : Turn::Black;
-    if (*turnOrder != pieceTurn || game->selectedPiece != nullptr)
-        return;
-
-    Ray mouseRay = GetScreenToWorldRay(GetMousePosition(), *camera);
-
-    Matrix worldTransform = MatrixMultiply(model->transform, MatrixTranslate(position.x, position.y, position.z));
-    RayCollision meshCollision = GetRayCollisionMesh(mouseRay, model->meshes[0], worldTransform);
-
-    if (meshCollision.hit && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
-    {
-        TraceLog(LOG_INFO, "Selected piece at position: (%f, %f, %f)", position.x, position.y, position.z);
-
-        selected = true;
-        game->selectedPiece = this;
-    }
-}
-
-void Piece::Deselect()
-{
-    Turn pieceTurn = (std::string(color) == "white") ? Turn::White : Turn::Black;
-    if (*turnOrder != pieceTurn || game->selectedPiece != this || game->selectedPiece == nullptr)
-        return;
-
-    Ray mouseRay = GetScreenToWorldRay(GetMousePosition(), *camera);
-
-    Matrix worldTransform = MatrixMultiply(model->transform, MatrixTranslate(position.x, position.y, position.z));
-    RayCollision meshCollision = GetRayCollisionMesh(mouseRay, model->meshes[0], worldTransform);
-
-    if (meshCollision.hit && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
-    {
-        TraceLog(LOG_INFO, "Deselected piece at position: (%f, %f, %f)", position.x, position.y, position.z);
-        selected = false;
-        game->selectedPiece = nullptr;
-    }
-}
-
 Game::Game()
 {
     InitWindow(screenWidth, screenHeight, "3D Chess");
     SetTargetFPS(60);
-    camera.position = {0.0f, 20.5f, 17.5f};
+    camera.position = {0.0f, 23.5f, 28.5f};
     camera.target = boardOrigin;
     camera.up = {0.0f, 1.0f, 0.0f};
     camera.fovy = 47.0f;
@@ -95,6 +12,7 @@ Game::Game()
     LoadModels();
     FillChessBoardSquares();
     InitPieces();
+    menu.Init();
 }
 
 Game::~Game()
@@ -106,6 +24,20 @@ Game::~Game()
 void Game::Update()
 {
     FlipCamera();
+
+    if (gameState == MENU)
+    {
+        menu.Update();
+        currentTheme = menu.GetTheme();
+        if (currentTheme != lastTheme)
+        {
+            lastTheme = currentTheme;
+            InitWhitePieces();
+            InitBlackPieces();
+        }
+        return;
+    }
+
     for (auto &piece : whitePieces)
     {
         piece.second.Update();
@@ -121,7 +53,7 @@ void Game::Draw()
     BeginDrawing();
     BeginMode3D(camera);
 
-    ClearBackground(RAYWHITE);
+    ClearBackground(Color{100, 100, 100, 255});
     DrawModel(chessBoardModels[currentTheme], boardOrigin, 1.0f, WHITE);
     for (auto &piece : whitePieces)
     {
@@ -132,6 +64,16 @@ void Game::Draw()
         piece.second.Draw();
     }
     EndMode3D();
+    switch (gameState)
+    {
+    case MENU:
+    {
+        menu.Draw();
+    }
+    break;
+    default:
+        break;
+    }
     EndDrawing();
 }
 
@@ -201,7 +143,7 @@ void Game::FillChessBoardSquares()
         for (int j = 0; j < 8; j++)
         {
             Vector3 squarePosition = {offsetFromBoardOrigin.x + i * squareSize, offsetFromBoardOrigin.y, offsetFromBoardOrigin.z - j * squareSize};
-            std::string squareName = std::string(1, static_cast<char>('A' + i)) + std::to_string(1 + j);
+            const char *squareName = "A" + i + 1 + j;
             chessBoardSquares[i][j].name = squareName;
             chessBoardSquares[i][j].position = squarePosition;
         }

@@ -2,13 +2,19 @@
 #define GAME_HPP
 #pragma once
 
-#include "raylib.h"
-#include "raymath.h"
-#include <map>
-#include <string>
-#include <cstdio>
+#include "Network.hpp"
+#include "Pieces.hpp"
+#include "Menu.hpp"
+
 
 class Game;
+
+enum GameState
+{
+    MENU = 1,
+    HOSTING,
+    CONNECTING
+};
 
 enum class Turn
 {
@@ -16,38 +22,11 @@ enum class Turn
     Black
 };
 
-class Piece
-{
-private:
-    std::string name;
-    Turn *turnOrder;
-    const char *color; // "black" or "white"
-    Vector3 position;
-    Vector3 validMoves[28];
-    Model *model;
-    Camera3D *camera;
-    Game *game;
-    bool hasMoved = false;
-    bool selected = false;
-
-public:
-    Piece() {}
-    Piece(const Piece &) = default;
-    Piece &operator=(const Piece &other);
-    Piece(Turn *turnOrder, const char *color, const Vector3 position, Model &model, Camera3D &camera, Game &game);
-    ~Piece();
-    void Update();
-    void Draw();
-    void Select();
-    void Deselect();
-    void MoveTo(const Vector3 &newPosition);
-    bool IsValidMove(const Vector3 &targetPosition);
-};
-
 struct BoardSquare
 {
-    std::string name;
+    const char *name;
     Vector3 position;
+    Piece *occupyingPiece = nullptr;
     bool isOccupied = false;
 };
 
@@ -55,6 +34,9 @@ class Game
 {
 private:
     // Window and camera
+    Network network;
+    Menu menu;
+    GameState gameState = MENU;
     const int screenWidth = 1280;
     const int screenHeight = 720;
     Camera3D camera = {0};
@@ -72,8 +54,8 @@ public:
     BoardSquare chessBoardSquares[8][8];
     std::map<std::string, Piece> whitePieces;
     std::map<std::string, Piece> blackPieces;
-    std::string themes[4] = {"black-white", "black-tan", "brown-white", "brown-tan"};
-    std::string currentTheme = themes[2];
+    std::string currentTheme = menu.GetTheme();
+    std::string lastTheme = currentTheme;
     Game();
     ~Game();
     void Update();
