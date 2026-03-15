@@ -13,6 +13,9 @@ Game::Game()
     FillChessBoardSquares();
     InitPieces();
     menu.Init();
+    if (network.Init())
+        TraceLog(LOG_INFO, "Network initialized.");
+    OccupyCells();
 }
 
 Game::~Game()
@@ -25,7 +28,9 @@ void Game::Update()
 {
     FlipCamera();
 
-    if (gameState == MENU)
+    switch (gameState)
+    {
+    case MENU:
     {
         menu.Update();
         currentTheme = menu.GetTheme();
@@ -35,16 +40,41 @@ void Game::Update()
             InitWhitePieces();
             InitBlackPieces();
         }
-        return;
-    }
+        if (menu.host.Clicked())
+        {
+            network.Host();
+            if (gameState != HOSTING)
+                gameState = HOSTING;
+        }
 
-    for (auto &piece : whitePieces)
-    {
-        piece.second.Update();
+        if (menu.join.Clicked())
+        {
+            network.Connect(ipToConnectTo);
+            if (network.IsConnected() == false)
+            {
+                throw ERROR_CONNECTION_INVALID;
+                return;
+            }
+            if (gameState != CONNECTING)
+                gameState = CONNECTING;
+        }
     }
-    for (auto &piece : blackPieces)
+    break;
+    case IN_MATCH:
     {
-        piece.second.Update();
+        for (auto &piece : whitePieces)
+        {
+            piece.second.Update();
+        }
+        for (auto &piece : blackPieces)
+        {
+            piece.second.Update();
+        }
+    }
+    break;
+
+    default:
+        break;
     }
 }
 
@@ -69,6 +99,18 @@ void Game::Draw()
     case MENU:
     {
         menu.Draw();
+    }
+    break;
+    case HOSTING:
+    {
+    }
+    break;
+    case CONNECTING:
+    {
+    }
+    break;
+    case IN_MATCH:
+    {
     }
     break;
     default:
@@ -143,9 +185,11 @@ void Game::FillChessBoardSquares()
         for (int j = 0; j < 8; j++)
         {
             Vector3 squarePosition = {offsetFromBoardOrigin.x + i * squareSize, offsetFromBoardOrigin.y, offsetFromBoardOrigin.z - j * squareSize};
-            const char *squareName = "A" + i + 1 + j;
-            chessBoardSquares[i][j].name = squareName;
+
+            chessBoardSquares[i][j].name[0] = 'A' + i;
+            chessBoardSquares[i][j].name[1] = '1' + j;
             chessBoardSquares[i][j].position = squarePosition;
+            TraceLog(LOG_INFO, "Cell %c%c created", chessBoardSquares[i][j].name[0], chessBoardSquares[i][j].name[1]);
         }
     }
 }
@@ -176,17 +220,16 @@ void Game::InitBlackPieces()
         pieceindex = (currentTheme.find("black") != std::string::npos ? darkColors[0] : darkColors[1]) + "-" + pieceNames[i];
         if (pieceNames[i] == "queen" || pieceNames[i] == "king")
         {
-            blackPieces.emplace(pieceNames[i], Piece(&turnOrder, "black", chessBoardSquares[i][7].position, blackPiecesModels[pieceindex], camera, *this));
+            blackPieces.emplace(pieceNames[i], Piece(&turnOrder, "black", "black-" + pieceNames[i], chessBoardSquares[i][7].position, blackPiecesModels[pieceindex], camera, *this));
             continue;
         }
-        blackPieces.emplace(pieceNames[i] + "_1", Piece(&turnOrder, "black", chessBoardSquares[i][7].position, blackPiecesModels[pieceindex], camera, *this));
-        blackPieces.emplace(pieceNames[i] + "_2", Piece(&turnOrder, "black", chessBoardSquares[7 - i][7].position, blackPiecesModels[pieceindex], camera, *this));
+        blackPieces.emplace(pieceNames[i] + "_1", Piece(&turnOrder, "black", "black-" + pieceNames[i], chessBoardSquares[i][7].position, blackPiecesModels[pieceindex], camera, *this));
+        blackPieces.emplace(pieceNames[i] + "_2", Piece(&turnOrder, "black", "black-" + pieceNames[i], chessBoardSquares[7 - i][7].position, blackPiecesModels[pieceindex], camera, *this));
     }
     for (int i = 0; i < 8; i++)
     {
         pieceindex = (currentTheme.find("black") != std::string::npos ? darkColors[0] : darkColors[1]) + "-pawn";
-
-        blackPieces.emplace("pawn_" + std::to_string(i + 1), Piece(&turnOrder, "black", chessBoardSquares[i][6].position, blackPiecesModels[pieceindex], camera, *this));
+        blackPieces.emplace("pawn_" + std::to_string(i + 1), Piece(&turnOrder, "black", "black-pawn", chessBoardSquares[i][6].position, blackPiecesModels[pieceindex], camera, *this));
     }
 }
 
@@ -202,15 +245,41 @@ void Game::InitWhitePieces()
         pieceindex = (currentTheme.find("white") != std::string::npos ? lightColors[0] : lightColors[1]) + "-" + pieceNames[i];
         if (pieceNames[i] == "queen" || pieceNames[i] == "king")
         {
-            whitePieces.emplace(pieceNames[i], Piece(&turnOrder, "white", chessBoardSquares[i][0].position, whitePiecesModels[pieceindex], camera, *this));
+            whitePieces.emplace(pieceNames[i], Piece(&turnOrder, "white", "white-" + pieceNames[i], chessBoardSquares[i][0].position, whitePiecesModels[pieceindex], camera, *this));
             continue;
         }
-        whitePieces.emplace(pieceNames[i] + "_1", Piece(&turnOrder, "white", chessBoardSquares[i][0].position, whitePiecesModels[pieceindex], camera, *this));
-        whitePieces.emplace(pieceNames[i] + "_2", Piece(&turnOrder, "white", chessBoardSquares[7 - i][0].position, whitePiecesModels[pieceindex], camera, *this));
+        whitePieces.emplace(pieceNames[i] + "_1", Piece(&turnOrder, "white", "white-" + pieceNames[i], chessBoardSquares[i][0].position, whitePiecesModels[pieceindex], camera, *this));
+        whitePieces.emplace(pieceNames[i] + "_2", Piece(&turnOrder, "white", "white-" + pieceNames[i], chessBoardSquares[7 - i][0].position, whitePiecesModels[pieceindex], camera, *this));
     }
     for (int i = 0; i < 8; i++)
     {
         pieceindex = (currentTheme.find("white") != std::string::npos ? lightColors[0] : lightColors[1]) + "-pawn";
-        whitePieces.emplace("pawn_" + std::to_string(i + 1), Piece(&turnOrder, "white", chessBoardSquares[i][1].position, whitePiecesModels[pieceindex], camera, *this));
+        whitePieces.emplace("pawn_" + std::to_string(i + 1), Piece(&turnOrder, "white", "white-pawn", chessBoardSquares[i][1].position, whitePiecesModels[pieceindex], camera, *this));
+    }
+}
+
+void Game::OccupyCells()
+{
+    for (auto &piece : whitePieces)
+    {
+        for (int i = 0; i < 8; i++)
+        {
+            for (int j = 0; j < 8; j++)
+            {
+                if (piece.second.position == chessBoardSquares[i][j].position)
+                    chessBoardSquares[i][j].occupyingPiece = &piece.second;
+            }
+        }
+    }
+    for (auto &piece : blackPieces)
+    {
+        for (int i = 0; i < 8; i++)
+        {
+            for (int j = 0; j < 8; j++)
+            {
+                if (piece.second.position == chessBoardSquares[i][j].position)
+                    chessBoardSquares[i][j].occupyingPiece = &piece.second;
+            }
+        }
     }
 }

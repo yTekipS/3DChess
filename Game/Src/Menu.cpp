@@ -70,6 +70,7 @@ void Menu::Init()
     join = Button(Rectangle{sidePanel.x + sidePanel.width / 2 - 120 / 2, sidePanel.height / 2 + 170, 120, 50}, darkGray, "JOIN");
     ipInputBox = Button(Rectangle{sidePanel.x + sidePanel.width / 2 - 120, sidePanel.height / 2 + 100, 240, 50}, darkGray, ip);
     letterCounter = TextLength(ip);
+    TraceLog(LOG_INFO, "Menu initialized");
 }
 
 std::string Menu::GetTheme()

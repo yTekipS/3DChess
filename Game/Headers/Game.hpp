@@ -13,7 +13,8 @@ enum GameState
 {
     MENU = 1,
     HOSTING,
-    CONNECTING
+    CONNECTING,
+    IN_MATCH
 };
 
 enum class Turn
@@ -24,7 +25,7 @@ enum class Turn
 
 struct BoardSquare
 {
-    const char *name;
+    char name[2];
     Vector3 position;
     Piece *occupyingPiece = nullptr;
     bool isOccupied = false;
@@ -48,6 +49,7 @@ private:
     // Pieces
     std::map<std::string, Model> blackPiecesModels;
     std::map<std::string, Model> whitePiecesModels;
+    std::string ipToConnectTo = "";
 
 public:
     Piece *selectedPiece = nullptr;
@@ -69,6 +71,7 @@ public:
     void InitPieces();
     void InitBlackPieces();
     void InitWhitePieces();
+    void OccupyCells();
 };
 
 #endif // GAME_HPP

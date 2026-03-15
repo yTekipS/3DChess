@@ -1,8 +1,8 @@
 #include "../Headers/Game.hpp"
 #include "../Headers/Pieces.hpp"
 
-Piece::Piece(Turn *turnOrder, const char *color, const Vector3 position, Model &model, Camera3D &camera, Game &game)
-    : turnOrder(turnOrder), color(color), position(position), model(&model), camera(&camera), game(&game)
+Piece::Piece(Turn *turnOrder, const char *color, std::string name, const Vector3 position, Model &model, Camera3D &camera, Game &game)
+    : turnOrder(turnOrder), color(color), position(position), model(&model),name(name) ,camera(&camera), game(&game)
 {
 }
 
