@@ -17,14 +17,18 @@ void Menu::Update()
 {
     if (shifThemeLeft.Clicked() && themeIndex > 0)
         themeIndex--;
-    if (shifThemeRight.Clicked() && themeIndex < 3)
+    else if (shifThemeLeft.Clicked() && themeIndex == 0)
+        themeIndex = THEMES_AMOUNT - 1;
+    if (shifThemeRight.Clicked() && themeIndex < THEMES_AMOUNT - 1)
         themeIndex++;
+    else if (shifThemeRight.Clicked() && themeIndex == THEMES_AMOUNT - 1)
+        themeIndex = 0;
     if (ipInputBox.Clicked() && !typing)
     {
         TraceLog(LOG_INFO, "Started typing");
         typing = true;
     }
-    else if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && typing)
+    else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && typing)
     {
         TraceLog(LOG_INFO, "Ended typing");
 

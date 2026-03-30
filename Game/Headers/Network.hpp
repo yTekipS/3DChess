@@ -3,16 +3,26 @@
 #pragma once
 
 #define WIN32_LEAN_AND_MEAN
-#define NOGDI   // prevents Rectangle() conflict with raylib
-#define NOUSER  // prevents CloseWindow() and ShowCursor() conflict with raylib
+#define NOGDI
+#define NOUSER
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <string>
+#include <array>
+#include <cstddef>
+#include <cstdint>
 
 #pragma comment(lib, "ws2_32.lib")
 
 #define NET_PORT "27015"
 #define NET_BUFSIZE 64
+
+enum class Turn
+{
+    NONE,
+    White,
+    Black
+};
 
 enum class NetworkRole
 {
@@ -21,11 +31,11 @@ enum class NetworkRole
     Client
 };
 
-// Represents a chess move sent over the network
+// Wire-safe fixed-size payload (NOT pointers)
 struct NetMove
 {
-    const char *fromSquare; // e.g. "A2"
-    const char *toSquare;   // e.g. "A4"
+    char *fromSquare; // "A2" + '\0'
+    char *toSquare;   // "A4" + '\0'
 };
 
 class Network
@@ -36,26 +46,27 @@ private:
     NetworkRole role  = NetworkRole::None;
     bool connected    = false;
 
+    // Partial receive accumulators (non-blocking sockets)
+    std::array<std::uint8_t, sizeof(NetMove)> moveRxBuf{};
+    std::size_t moveRxBytes = 0;
+
+    std::array<std::uint8_t, 1> turnRxBuf{};
+    std::size_t turnRxBytes = 0;
+
 public:
     Network() = default;
     ~Network();
 
-    // Call once before using the network
     bool Init();
-
-    // Start hosting – waits (blocks) for one client to connect
     bool Host();
-
-    // Connect to a host at the given IP address
     bool Connect(const std::string &ip);
 
-    // Send a move to the remote player. Returns false on error.
     bool SendMove(const NetMove &move);
+    bool SendTurn(Turn turn);
 
-    // Receive a move (non-blocking). Returns true if a move was received.
     bool RecvMove(NetMove &outMove);
+    bool RecvTurn(Turn &outTurn);
 
-    // Gracefully shut down the connection
     void Disconnect();
 
     bool IsConnected() const { return connected; }

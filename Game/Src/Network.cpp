@@ -2,6 +2,42 @@
 #include <cstring>
 #include <cstdio>
 
+namespace
+{
+    bool SendAllNonBlocking(SOCKET sock, const char* data, int len)
+    {
+        int sent = 0;
+        while (sent < len)
+        {
+            int r = send(sock, data + sent, len - sent, 0);
+            if (r > 0)
+            {
+                sent += r;
+                continue;
+            }
+            if (r == 0) return false;
+
+            int err = WSAGetLastError();
+            if (err == WSAEWOULDBLOCK)
+            {
+                fd_set writeSet;
+                FD_ZERO(&writeSet);
+                FD_SET(sock, &writeSet);
+
+                timeval tv{};
+                tv.tv_sec = 0;
+                tv.tv_usec = 200000; // 200ms
+
+                int sel = select(0, nullptr, &writeSet, nullptr, &tv);
+                if (sel <= 0) return false;
+                continue;
+            }
+            return false;
+        }
+        return true;
+    }
+}   
+
 bool Network::Init()
 {
     WSADATA wsaData;
@@ -187,10 +223,26 @@ bool Network::SendMove(const NetMove &move)
 {
     if (!connected) return false;
 
-    int result = send(connSock, reinterpret_cast<const char *>(&move), sizeof(NetMove), 0);
-    if (result == SOCKET_ERROR)
+    const char* bytes = reinterpret_cast<const char*>(&move);
+    if (!SendAllNonBlocking(connSock, bytes, static_cast<int>(sizeof(NetMove))))
     {
-        printf("[Network] send() failed: %d\n", WSAGetLastError());
+        printf("[Network] send(move) failed: %d\n", WSAGetLastError());
+        connected = false;
+        return false;
+    }
+    return true;
+}
+
+bool Network::SendTurn(Turn turn)
+{
+    if (!connected) return false;
+
+    std::uint8_t wireTurn = static_cast<std::uint8_t>(turn);
+    const char* bytes = reinterpret_cast<const char*>(&wireTurn);
+
+    if (!SendAllNonBlocking(connSock, bytes, 1))
+    {
+        printf("[Network] send(turn) failed: %d\n", WSAGetLastError());
         connected = false;
         return false;
     }
@@ -201,17 +253,86 @@ bool Network::RecvMove(NetMove &outMove)
 {
     if (!connected) return false;
 
-    int result = recv(connSock, reinterpret_cast<char *>(&outMove), sizeof(NetMove), 0);
-    if (result == sizeof(NetMove))
-        return true;
-
-    if (result == 0)
+    while (moveRxBytes < sizeof(NetMove))
     {
-        printf("[Network] Connection closed by remote.\n");
+        int r = recv(
+            connSock,
+            reinterpret_cast<char*>(moveRxBuf.data() + moveRxBytes),
+            static_cast<int>(sizeof(NetMove) - moveRxBytes),
+            0
+        );
+
+        if (r > 0)
+        {
+            moveRxBytes += static_cast<std::size_t>(r);
+            continue;
+        }
+
+        if (r == 0)
+        {
+            printf("[Network] Connection closed by remote.\n");
+            connected = false;
+            return false;
+        }
+
+        int err = WSAGetLastError();
+        if (err == WSAEWOULDBLOCK) return false;
+
+        printf("[Network] recv(move) failed: %d\n", err);
         connected = false;
+        return false;
     }
-    // WSAEWOULDBLOCK means no data yet — that's normal in non-blocking mode
-    return false;
+
+    std::memcpy(&outMove, moveRxBuf.data(), sizeof(NetMove));
+    moveRxBytes = 0;
+    return true;
+}
+
+bool Network::RecvTurn(Turn &outTurn)
+{
+    if (!connected) return false;
+
+    while (turnRxBytes < 1)
+    {
+        int r = recv(
+            connSock,
+            reinterpret_cast<char*>(turnRxBuf.data() + turnRxBytes),
+            static_cast<int>(1 - turnRxBytes),
+            0
+        );
+
+        if (r > 0)
+        {
+            turnRxBytes += static_cast<std::size_t>(r);
+            continue;
+        }
+
+        if (r == 0)
+        {
+            printf("[Network] Connection closed by remote.\n");
+            connected = false;
+            return false;
+        }
+
+        int err = WSAGetLastError();
+        if (err == WSAEWOULDBLOCK) return false;
+
+        printf("[Network] recv(turn) failed: %d\n", err);
+        connected = false;
+        return false;
+    }
+
+    const std::uint8_t wire = turnRxBuf[0];
+    turnRxBytes = 0;
+
+    if (wire > static_cast<std::uint8_t>(Turn::Black))
+    {
+        printf("[Network] Invalid turn value received: %u\n", static_cast<unsigned>(wire));
+        return false;
+    }
+
+    outTurn = static_cast<Turn>(wire);
+    return true;
 }
 
 void Network::Disconnect()
@@ -228,6 +349,8 @@ void Network::Disconnect()
         listenSock = INVALID_SOCKET;
     }
     connected = false;
+    moveRxBytes = 0;
+    turnRxBytes = 0;
     WSACleanup();
 }
 

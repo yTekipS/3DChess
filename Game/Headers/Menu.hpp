@@ -6,6 +6,7 @@
 #include <string>
 
 #define MAX_INPUT_CHARS 15
+#define THEMES_AMOUNT 4
 
 class Button
 {
@@ -25,7 +26,7 @@ private:
     Vector2 screenSize = {0};
     Rectangle sidePanel = {0};
     int themeIndex = 0;
-    const char *themes[4] = {"black-white", "black-tan", "brown-white", "brown-tan"};
+    const char *themes[THEMES_AMOUNT] = {"black-white", "black-tan", "brown-white", "brown-tan"};
     Button shifThemeLeft;
     Button shifThemeRight;
     Rectangle themeRec;
